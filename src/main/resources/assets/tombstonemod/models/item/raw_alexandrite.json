@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+    "textures": {
+        "layer0": "tombstonemod:item/raw_alexandrite"
+    }
+}
