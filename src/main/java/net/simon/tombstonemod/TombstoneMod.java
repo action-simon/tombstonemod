@@ -15,7 +15,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -37,14 +36,17 @@ import java.util.List;
 public class TombstoneMod
 {
     public static final String MOD_ID = "tombstonemod";
+    private static final int TNT_EXPLOSIONS_COUNT = 1000;
     // Directly reference a slf4j logger
     // public static final Logger LOGGER = LogUtils.getLogger();
 
+    @SuppressWarnings("removal")
     public TombstoneMod()
     {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::commonSetup);
         MinecraftForge.EVENT_BUS.register(this);
+
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
@@ -52,11 +54,6 @@ public class TombstoneMod
     private void commonSetup(final FMLCommonSetupEvent event)
     {
     }
-
-    private void addCreative(BuildCreativeModeTabContentsEvent event)
-    {
-    }
-
 
     private void sendRespawnMessage(Player player) {
         player.sendSystemMessage(Component.literal("§6§lYou have fallen in battle, brave adventurer. §r§6Your items await you at the place of your demise. §r§6Embark on a quest to reclaim your lost treasures and continue your epic journey!"));
@@ -75,17 +72,17 @@ public class TombstoneMod
 
 
     private void createChests(ServerLevel world, BlockPos chestPos1, BlockPos chestPos2) {
-        BlockState chestState1 = Blocks.CHEST.defaultBlockState()
-                .setValue(ChestBlock.FACING, Direction.NORTH)
-                .setValue(ChestBlock.TYPE, ChestType.LEFT);
-        BlockState chestState2 = Blocks.CHEST.defaultBlockState()
-                .setValue(ChestBlock.FACING, Direction.NORTH)
-                .setValue(ChestBlock.TYPE, ChestType.RIGHT);
+        BlockState chestState1 = createChestBlockState(ChestType.LEFT);
+        BlockState chestState2 = createChestBlockState(ChestType.RIGHT);
 
         world.setBlock(chestPos1, chestState1, 3);
         world.setBlock(chestPos2, chestState2, 3);
-        world.sendBlockUpdated(chestPos1, chestState1, chestState1, 3);
-        world.sendBlockUpdated(chestPos2, chestState2, chestState2, 3);
+    }
+
+    private BlockState createChestBlockState(ChestType chestType) {
+        return Blocks.CHEST.defaultBlockState()
+                .setValue(ChestBlock.FACING, Direction.NORTH)
+                .setValue(ChestBlock.TYPE, chestType);
     }
 
     private void transferItemsToChests(Player player, BlockPos chestPos1, BlockPos chestPos2) {
@@ -94,7 +91,7 @@ public class TombstoneMod
         BlockEntity blockEntity2 = world.getBlockEntity(chestPos2);
 
         if (blockEntity1 == null || blockEntity2 == null) {
-            // Log or handle the error
+            player.sendSystemMessage(Component.literal("§cError: Unable to create chests. Please contact support."));
             return;
         }
 
@@ -102,7 +99,10 @@ public class TombstoneMod
                 blockEntity2 instanceof ChestBlockEntity chestEntity2) {
             List<ItemStack> allItems = collectItems(player);
 
+            // First, clear the player's inventory after collecting items
             player.getInventory().clearContent();
+
+
             int totalSlots = chestEntity1.getContainerSize() + chestEntity2.getContainerSize();
             for (int i = 0; i < allItems.size() && i < totalSlots; i++) {
                 if (i < chestEntity1.getContainerSize()) {
@@ -138,9 +138,8 @@ public class TombstoneMod
     }
 
     private void triggerTNTExplosions(ServerLevel world, BlockPos pos) {
-        final int TNT_EXPLOSIONS_COUNT = 1000;  // Define number of TNT explosions
         for (int i = 0; i < TNT_EXPLOSIONS_COUNT; i++) {
-            BlockPos tntPos = calculateTNTPosition(world, pos);
+            BlockPos tntPos = getRandomOffsetPosition(world, pos);
             createAndAddTNTEntity(world, tntPos);
         }
     }
@@ -154,9 +153,9 @@ public class TombstoneMod
         }
     }
 
-    private BlockPos calculateTNTPosition(ServerLevel world, BlockPos pos) {
+    private BlockPos getRandomOffsetPosition(ServerLevel world, BlockPos pos) {
         double offsetX = (world.random.nextDouble() - 0.5) * 20;
-        double offsetY = (world.random.nextDouble() * 10);
+        double offsetY = (world.random.nextDouble() * 20);
         double offsetZ = (world.random.nextDouble() - 0.5) * 20;
         return pos.offset((int) offsetX, (int) offsetY, (int) offsetZ);
     }
